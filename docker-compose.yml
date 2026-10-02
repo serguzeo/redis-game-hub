@@ -1,0 +1,123 @@
+# GameHub: Redis master + 2 реплики + 3 Sentinel + Redis Insight + приложение
+#
+#   docker compose up -d                        — только окружение (приложение запускается из IDE)
+#   docker compose --profile app up -d --build  — окружение + приложение в контейнере
+x-redis-image: &redis-image redis:8.10.2
+
+x-replica: &replica
+  image: *redis-image
+  depends_on:
+    redis-master:
+      condition: service_healthy
+  networks: [gamehub]
+  restart: unless-stopped
+
+x-sentinel: &sentinel
+  image: *redis-image
+  depends_on:
+    redis-master:
+      condition: service_healthy
+  volumes:
+    - ./redis/sentinel.conf:/etc/redis/sentinel.conf.tpl:ro
+  networks: [gamehub]
+  restart: unless-stopped
+
+services:
+  redis-master:
+    image: *redis-image
+    container_name: redis-master
+    hostname: redis-master
+    command: redis-server /etc/redis/redis.conf
+    ports: ["6379:6379"]
+    volumes:
+      - ./redis/master.conf:/etc/redis/redis.conf:ro
+      - master-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    networks: [gamehub]
+    restart: unless-stopped
+
+  redis-replica-1:
+    <<: *replica
+    container_name: redis-replica-1
+    hostname: redis-replica-1
+    command: redis-server /etc/redis/redis.conf --port 6380 --replica-announce-ip redis-replica-1
+    ports: ["6380:6380"]
+    volumes:
+      - ./redis/replica.conf:/etc/redis/redis.conf:ro
+      - replica-1-data:/data
+
+  redis-replica-2:
+    <<: *replica
+    container_name: redis-replica-2
+    hostname: redis-replica-2
+    command: redis-server /etc/redis/redis.conf --port 6381 --replica-announce-ip redis-replica-2
+    ports: ["6381:6381"]
+    volumes:
+      - ./redis/replica.conf:/etc/redis/redis.conf:ro
+      - replica-2-data:/data
+
+  sentinel-1:
+    <<: *sentinel
+    container_name: sentinel-1
+    hostname: sentinel-1
+    command: >
+      sh -c "sed -e 's/__PORT__/26379/g' -e 's/__HOST__/sentinel-1/g'
+      /etc/redis/sentinel.conf.tpl > /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf"
+    ports: ["26379:26379"]
+
+  sentinel-2:
+    <<: *sentinel
+    container_name: sentinel-2
+    hostname: sentinel-2
+    command: >
+      sh -c "sed -e 's/__PORT__/26380/g' -e 's/__HOST__/sentinel-2/g'
+      /etc/redis/sentinel.conf.tpl > /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf"
+    ports: ["26380:26380"]
+
+  sentinel-3:
+    <<: *sentinel
+    container_name: sentinel-3
+    hostname: sentinel-3
+    command: >
+      sh -c "sed -e 's/__PORT__/26381/g' -e 's/__HOST__/sentinel-3/g'
+      /etc/redis/sentinel.conf.tpl > /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf"
+    ports: ["26381:26381"]
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    ports: ["5540:5540"]
+    volumes:
+      - insight-data:/data
+    networks: [gamehub]
+    restart: unless-stopped
+
+  app:
+    profiles: [app]
+    build: .
+    container_name: gamehub-app
+    depends_on:
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
+      - redis-replica-1
+      - redis-replica-2
+    environment:
+      REDIS_SENTINEL_NODES: sentinel-1:26379,sentinel-2:26380,sentinel-3:26381
+    ports: ["${APP_PORT:-8080}:8080"]
+    networks: [gamehub]
+    restart: unless-stopped
+
+networks:
+  gamehub:
+    name: gamehub
+
+volumes:
+  master-data:
+  replica-1-data:
+  replica-2-data:
+  insight-data:

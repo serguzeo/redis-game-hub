@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: redis-game-hub
+  data:
+    redis:
+      sentinel:
+        master: mymaster
+        nodes: ${REDIS_SENTINEL_NODES:sentinel-1:26379,sentinel-2:26380,sentinel-3:26381}
+      timeout: 3s
+      connect-timeout: 2s
+
+logging:
+  level:
+    com.gamehub: DEBUG

@@ -1,0 +1,120 @@
+@host = http://localhost:8081
+
+### Создать профиль Alice
+POST {{host}}/api/players/1001
+Content-Type: application/json
+
+{"name": "Alice", "level": 5, "region": "EU"}
+
+### Создать профиль Bob
+POST {{host}}/api/players/1002
+Content-Type: application/json
+
+{"name": "Bob", "level": 3, "region": "US"}
+
+### Получить профиль (первый раз X-Cache: MISS, второй — HIT)
+GET {{host}}/api/players/1001
+
+### Повысить уровень (сбрасывает кеш, пишет уведомление в поток)
+PATCH {{host}}/api/players/1001/level
+Content-Type: application/json
+
+{"delta": 2}
+
+### Вход игрока (Lua: INCR + EXPIRE)
+POST {{host}}/api/players/1001/login
+
+### Очки: Alice +50
+POST {{host}}/api/leaderboard/score
+Content-Type: application/json
+
+{"playerId": "1001", "score": 50}
+
+### Очки: Bob +70
+POST {{host}}/api/leaderboard/score
+Content-Type: application/json
+
+{"playerId": "1002", "score": 70}
+
+### Очки: Alice +30
+POST {{host}}/api/leaderboard/score
+Content-Type: application/json
+
+{"playerId": "1001", "score": 30}
+
+### Топ-10
+GET {{host}}/api/leaderboard/top?limit=10
+
+### Место игрока
+GET {{host}}/api/leaderboard/rank/1002
+
+### Достижение Alice: game changer!
+POST {{host}}/api/players/1001/achievements
+Content-Type: application/json
+
+{"name": "game changer!"}
+
+### Достижение Alice: monster
+POST {{host}}/api/players/1001/achievements
+Content-Type: application/json
+
+{"name": "monster"}
+
+### Достижение Bob: game changer!
+POST {{host}}/api/players/1002/achievements
+Content-Type: application/json
+
+{"name": "game changer!"}
+
+### Достижение Bob: monster
+POST {{host}}/api/players/1002/achievements
+Content-Type: application/json
+
+{"name": "monster"}
+
+### Достижение Bob: killer
+POST {{host}}/api/players/1002/achievements
+Content-Type: application/json
+
+{"name": "killer"}
+
+### Есть ли у Alice monster (true)
+GET {{host}}/api/players/1001/achievements/monster
+
+### Есть ли у Alice killer (false)
+GET {{host}}/api/players/1001/achievements/killer
+
+### Общие достижения Alice и Bob
+GET {{host}}/api/players/1001/achievements/common/1002
+
+### Массовая загрузка 20 профилей (pipeline)
+POST {{host}}/api/players/batch
+Content-Type: application/json
+
+{
+  "players": [
+    {"id": "2001", "name": "Bot1", "level": 1, "region": "EU"},
+    {"id": "2002", "name": "Bot2", "level": 2, "region": "US"},
+    {"id": "2003", "name": "Bot3", "level": 3, "region": "ASIA"},
+    {"id": "2004", "name": "Bot4", "level": 4, "region": "EU"},
+    {"id": "2005", "name": "Bot5", "level": 5, "region": "US"},
+    {"id": "2006", "name": "Bot6", "level": 6, "region": "ASIA"},
+    {"id": "2007", "name": "Bot7", "level": 7, "region": "EU"},
+    {"id": "2008", "name": "Bot8", "level": 8, "region": "US"},
+    {"id": "2009", "name": "Bot9", "level": 9, "region": "ASIA"},
+    {"id": "2010", "name": "Bot10", "level": 10, "region": "EU"},
+    {"id": "2011", "name": "Bot11", "level": 1, "region": "US"},
+    {"id": "2012", "name": "Bot12", "level": 2, "region": "ASIA"},
+    {"id": "2013", "name": "Bot13", "level": 3, "region": "EU"},
+    {"id": "2014", "name": "Bot14", "level": 4, "region": "US"},
+    {"id": "2015", "name": "Bot15", "level": 5, "region": "ASIA"},
+    {"id": "2016", "name": "Bot16", "level": 6, "region": "EU"},
+    {"id": "2017", "name": "Bot17", "level": 7, "region": "US"},
+    {"id": "2018", "name": "Bot18", "level": 8, "region": "ASIA"},
+    {"id": "2019", "name": "Bot19", "level": 9, "region": "EU"},
+    {"id": "2020", "name": "Bot20", "level": 10, "region": "US"}
+  ]
+}
+
+### Ошибка 404: нет такого игрока
+GET {{host}}/api/players/9999
